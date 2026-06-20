@@ -11,8 +11,8 @@ from app.core.security import create_access_token, hash_password, verify_passwor
 from app.db.dependencies import get_db
 from app.models.user import User
 from app.repositories.user import create_user, get_user_by_email, get_user_by_id, get_user_by_verification_token_hash, \
-    verify_user_email
-from app.schemas.auth import LoginRequest, Token, MessageResponse, ResendVerificationRequest
+    verify_user_email, update_user_password, get_user_by_password_reset_token_hash
+from app.schemas.auth import LoginRequest, Token, MessageResponse, ResendVerificationRequest, ResetPasswordRequest
 from app.schemas.user import UserCreate, UserResponse
 from app.core.tokens import (
     generate_token,
@@ -167,6 +167,66 @@ def resend_verification(
     return MessageResponse(
         message="If this email exists, verification instructions were sent."
     )
+
+@router.post("/forgot-password", response_model=MessageResponse)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    user = get_user_by_email(db, payload.email)
+
+    if not user:
+        return MessageResponse(
+            message="If this email exists, password reset instructions were sent."
+        )
+
+    reset_token = generate_token()
+
+    set_password_reset_token(
+        db,
+        user,
+        hash_token(reset_token),
+        get_token_expiration(hours=1),
+    )
+
+    send_password_reset_email(user.email, reset_token)
+
+    return MessageResponse(
+        message="If this email exists, password reset instructions were sent."
+    )
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+):
+    token_hash = hash_token(payload.token)
+
+    user = get_user_by_password_reset_token_hash(db, token_hash)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid password reset token",
+        )
+
+    if (
+        user.password_reset_expires_at is None
+        or user.password_reset_expires_at < datetime.now(timezone.utc)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password reset token expired",
+        )
+
+    update_user_password(
+        db,
+        user,
+        hash_password(payload.new_password),
+    )
+
+    return MessageResponse(message="Password has been reset successfully")
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):

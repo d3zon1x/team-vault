@@ -34,6 +34,7 @@ def create_user(
 
     return user
 
+
 def set_verification_token(
     db: Session,
     user: User,
@@ -58,6 +59,41 @@ def verify_user_email(db: Session, user: User) -> User:
     user.is_verified = True
     user.verification_token_hash = None
     user.verification_token_expires_at = None
+
+    db.commit()
+    db.refresh(user)
+
+    return user
+
+
+def set_password_reset_token(
+    db: Session,
+    user: User,
+    token_hash: str,
+    expires_at: datetime,
+) -> None:
+    user.password_reset_token_hash = token_hash
+    user.password_reset_expires_at = expires_at
+
+    db.commit()
+
+
+def get_user_by_password_reset_token_hash(
+    db: Session,
+    token_hash: str,
+) -> User | None:
+    statement = select(User).where(User.password_reset_token_hash == token_hash)
+    return db.execute(statement).scalar_one_or_none()
+
+
+def update_user_password(
+    db: Session,
+    user: User,
+    hashed_password: str,
+) -> User:
+    user.hashed_password = hashed_password
+    user.password_reset_token_hash = None
+    user.password_reset_expires_at = None
 
     db.commit()
     db.refresh(user)
