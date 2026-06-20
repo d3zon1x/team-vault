@@ -45,3 +45,21 @@ def set_verification_token(
 
     db.add(user)
     db.commit()
+
+def get_user_by_verification_token_hash(
+    db: Session,
+    token_hash: str,
+) -> User | None:
+    statement = select(User).where(User.verification_token_hash == token_hash)
+    return db.execute(statement).scalar_one_or_none()
+
+
+def verify_user_email(db: Session, user: User) -> User:
+    user.is_verified = True
+    user.verification_token_hash = None
+    user.verification_token_expires_at = None
+
+    db.commit()
+    db.refresh(user)
+
+    return user

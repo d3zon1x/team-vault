@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -8,8 +10,9 @@ from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.dependencies import get_db
 from app.models.user import User
-from app.repositories.user import create_user, get_user_by_email, get_user_by_id
-from app.schemas.auth import LoginRequest, Token
+from app.repositories.user import create_user, get_user_by_email, get_user_by_id, get_user_by_verification_token_hash, \
+    verify_user_email
+from app.schemas.auth import LoginRequest, Token, MessageResponse
 from app.schemas.user import UserCreate, UserResponse
 from app.core.tokens import (
     generate_token,
@@ -24,7 +27,11 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 security = HTTPBearer()
 
 
-@router.post("/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=MessageResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def register(payload: UserCreate, db: Session = Depends(get_db)):
     existing_user = get_user_by_email(db, payload.email)
 
@@ -41,23 +48,18 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         hashed_password=hash_password(payload.password),
     )
 
-    # access_token = create_access_token(subject=user.id)
-
     verification_token = generate_token()
 
     set_verification_token(
         db,
         user,
         hash_token(verification_token),
-        get_token_expiration(),
+        get_token_expiration(hours=24),
     )
 
-    send_verification_email(
-        user.email,
-        verification_token,
-    )
+    send_verification_email(user.email, verification_token)
 
-    return {"message": "Check your email"}
+    return MessageResponse(message="Registration successful. Check your email.")
 
 
 @router.post("/login", response_model=Token)
@@ -109,6 +111,31 @@ def get_current_user(
         )
 
     return user
+
+@router.get("/verify-email", response_model=MessageResponse)
+def verify_email(token: str, db: Session = Depends(get_db)):
+    token_hash = hash_token(token)
+
+    user = get_user_by_verification_token_hash(db, token_hash)
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid verification token",
+        )
+
+    if (
+        user.verification_token_expires_at is None
+        or user.verification_token_expires_at < datetime.now(timezone.utc)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Verification token expired",
+        )
+
+    verify_user_email(db, user)
+
+    return MessageResponse(message="Email verified successfully")
 
 
 @router.get("/me", response_model=UserResponse)
