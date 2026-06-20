@@ -12,7 +12,7 @@ from app.db.dependencies import get_db
 from app.models.user import User
 from app.repositories.user import create_user, get_user_by_email, get_user_by_id, get_user_by_verification_token_hash, \
     verify_user_email
-from app.schemas.auth import LoginRequest, Token, MessageResponse
+from app.schemas.auth import LoginRequest, Token, MessageResponse, ResendVerificationRequest
 from app.schemas.user import UserCreate, UserResponse
 from app.core.tokens import (
     generate_token,
@@ -137,6 +137,36 @@ def verify_email(token: str, db: Session = Depends(get_db)):
 
     return MessageResponse(message="Email verified successfully")
 
+
+@router.post("/resend-verification", response_model=MessageResponse)
+def resend_verification(
+    payload: ResendVerificationRequest,
+    db: Session = Depends(get_db),
+):
+    user = get_user_by_email(db, payload.email)
+
+    if not user:
+        return MessageResponse(
+            message="If this email exists, verification instructions were sent."
+        )
+
+    if user.is_verified:
+        return MessageResponse(message="Email is already verified.")
+
+    verification_token = generate_token()
+
+    set_verification_token(
+        db,
+        user,
+        hash_token(verification_token),
+        get_token_expiration(hours=24),
+    )
+
+    send_verification_email(user.email, verification_token)
+
+    return MessageResponse(
+        message="If this email exists, verification instructions were sent."
+    )
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):

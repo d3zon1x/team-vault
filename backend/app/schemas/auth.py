@@ -13,3 +13,6 @@ class LoginRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+class ResendVerificationRequest(BaseModel):
+    email: str
