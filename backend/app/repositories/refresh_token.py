@@ -41,3 +41,16 @@ def delete_refresh_token(
 ) -> None:
     db.delete(refresh_token)
     db.commit()
+
+
+def delete_all_refresh_tokens_for_user(
+    db: Session,
+    user_id: int,
+) -> None:
+    statement = select(RefreshToken).where(RefreshToken.user_id == user_id)
+    tokens = db.execute(statement).scalars().all()
+
+    for token in tokens:
+        db.delete(token)
+
+    db.commit()

@@ -5,6 +5,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+from app.api.api.dependencies import get_current_user
 from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.tokens import (
@@ -14,7 +15,12 @@ from app.core.tokens import (
 )
 from app.db.dependencies import get_db
 from app.models.user import User
-from app.repositories.refresh_token import create_refresh_token, get_refresh_token_by_hash, delete_refresh_token
+from app.repositories.refresh_token import (
+    create_refresh_token,
+    delete_all_refresh_tokens_for_user,
+    delete_refresh_token,
+    get_refresh_token_by_hash,
+)
 from app.repositories.user import create_user, get_user_by_email, get_user_by_id, get_user_by_verification_token_hash, \
     verify_user_email, update_user_password, get_user_by_password_reset_token_hash, set_password_reset_token
 from app.repositories.user import set_verification_token
@@ -96,34 +102,29 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     )
 
 
-def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(security),
-        db: Session = Depends(get_db),
-) -> User:
-    token = credentials.credentials
+@router.post("/logout-all", response_model=MessageResponse)
+def logout_all(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    delete_all_refresh_tokens_for_user(db, current_user.id)
 
-    try:
-        payload = jwt.decode(
-            token,
-            settings.jwt_secret_key,
-            algorithms=[settings.jwt_algorithm],
-        )
-        user_id = int(payload.get("sub"))
-    except (JWTError, TypeError, ValueError):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-        )
+    return MessageResponse(message="Logged out from all devices successfully")
 
-    user = get_user_by_id(db, user_id)
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
-        )
+@router.post("/logout", response_model=MessageResponse)
+def logout(
+    payload: RefreshTokenRequest,
+    db: Session = Depends(get_db),
+):
+    token_hash = hash_token(payload.refresh_token)
 
-    return user
+    refresh_token = get_refresh_token_by_hash(db, token_hash)
+
+    if refresh_token:
+        delete_refresh_token(db, refresh_token)
+
+    return MessageResponse(message="Logged out successfully")
 
 
 @router.get("/verify-email", response_model=MessageResponse)
