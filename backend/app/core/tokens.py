@@ -13,3 +13,6 @@ def hash_token(token: str) -> str:
 
 def get_token_expiration(hours: int = 24) -> datetime:
     return datetime.now(timezone.utc) + timedelta(hours=hours)
+
+def get_refresh_token_expiration(days: int = 30) -> datetime:
+    return datetime.now(timezone.utc) + timedelta(days=days)

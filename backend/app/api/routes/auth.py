@@ -5,23 +5,23 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
-
 from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
-from app.db.dependencies import get_db
-from app.models.user import User
-from app.repositories.user import create_user, get_user_by_email, get_user_by_id, get_user_by_verification_token_hash, \
-    verify_user_email, update_user_password, get_user_by_password_reset_token_hash
-from app.schemas.auth import LoginRequest, Token, MessageResponse, ResendVerificationRequest, ResetPasswordRequest, \
-    ChangePasswordRequest
-from app.schemas.user import UserCreate, UserResponse
 from app.core.tokens import (
     generate_token,
     get_token_expiration,
-    hash_token,
+    hash_token, get_refresh_token_expiration,
 )
-from app.services.email import send_verification_email
+from app.db.dependencies import get_db
+from app.models.user import User
+from app.repositories.refresh_token import create_refresh_token, get_refresh_token_by_hash, delete_refresh_token
+from app.repositories.user import create_user, get_user_by_email, get_user_by_id, get_user_by_verification_token_hash, \
+    verify_user_email, update_user_password, get_user_by_password_reset_token_hash, set_password_reset_token
 from app.repositories.user import set_verification_token
+from app.schemas.auth import LoginRequest, Token, MessageResponse, ResendVerificationRequest, ResetPasswordRequest, \
+    ChangePasswordRequest, ForgotPasswordRequest, AccessTokenResponse, RefreshTokenRequest
+from app.schemas.user import UserCreate, UserResponse
+from app.services.email import send_verification_email, send_password_reset_email
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -81,12 +81,24 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
     access_token = create_access_token(subject=user.id)
 
-    return Token(access_token=access_token)
+    refresh_token = generate_token()
+
+    create_refresh_token(
+        db,
+        user=user,
+        token_hash=hash_token(refresh_token),
+        expires_at=get_refresh_token_expiration(days=30),
+    )
+
+    return Token(
+        access_token=access_token,
+        refresh_token=refresh_token,
+    )
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db),
+        credentials: HTTPAuthorizationCredentials = Depends(security),
+        db: Session = Depends(get_db),
 ) -> User:
     token = credentials.credentials
 
@@ -113,6 +125,7 @@ def get_current_user(
 
     return user
 
+
 @router.get("/verify-email", response_model=MessageResponse)
 def verify_email(token: str, db: Session = Depends(get_db)):
     token_hash = hash_token(token)
@@ -126,8 +139,8 @@ def verify_email(token: str, db: Session = Depends(get_db)):
         )
 
     if (
-        user.verification_token_expires_at is None
-        or user.verification_token_expires_at < datetime.now(timezone.utc)
+            user.verification_token_expires_at is None
+            or user.verification_token_expires_at < datetime.now(timezone.utc)
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -141,8 +154,8 @@ def verify_email(token: str, db: Session = Depends(get_db)):
 
 @router.post("/resend-verification", response_model=MessageResponse)
 def resend_verification(
-    payload: ResendVerificationRequest,
-    db: Session = Depends(get_db),
+        payload: ResendVerificationRequest,
+        db: Session = Depends(get_db),
 ):
     user = get_user_by_email(db, payload.email)
 
@@ -169,10 +182,11 @@ def resend_verification(
         message="If this email exists, verification instructions were sent."
     )
 
+
 @router.post("/forgot-password", response_model=MessageResponse)
 def forgot_password(
-    payload: ForgotPasswordRequest,
-    db: Session = Depends(get_db),
+        payload: ForgotPasswordRequest,
+        db: Session = Depends(get_db),
 ):
     user = get_user_by_email(db, payload.email)
 
@@ -199,8 +213,8 @@ def forgot_password(
 
 @router.post("/reset-password", response_model=MessageResponse)
 def reset_password(
-    payload: ResetPasswordRequest,
-    db: Session = Depends(get_db),
+        payload: ResetPasswordRequest,
+        db: Session = Depends(get_db),
 ):
     token_hash = hash_token(payload.token)
 
@@ -213,8 +227,8 @@ def reset_password(
         )
 
     if (
-        user.password_reset_expires_at is None
-        or user.password_reset_expires_at < datetime.now(timezone.utc)
+            user.password_reset_expires_at is None
+            or user.password_reset_expires_at < datetime.now(timezone.utc)
     ):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -229,11 +243,12 @@ def reset_password(
 
     return MessageResponse(message="Password has been reset successfully")
 
+
 @router.post("/change-password", response_model=MessageResponse)
 def change_password(
-    payload: ChangePasswordRequest,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+        payload: ChangePasswordRequest,
+        current_user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
 ):
     if not current_user.hashed_password:
         raise HTTPException(
@@ -254,6 +269,33 @@ def change_password(
     )
 
     return MessageResponse(message="Password changed successfully")
+
+@router.post("/refresh", response_model=AccessTokenResponse)
+def refresh_access_token(
+    payload: RefreshTokenRequest,
+    db: Session = Depends(get_db),
+):
+    token_hash = hash_token(payload.refresh_token)
+
+    refresh_token = get_refresh_token_by_hash(db, token_hash)
+
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    if refresh_token.expires_at < datetime.now(timezone.utc):
+        delete_refresh_token(db, refresh_token)
+
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token expired",
+        )
+
+    access_token = create_access_token(subject=refresh_token.user_id)
+
+    return AccessTokenResponse(access_token=access_token)
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
