@@ -14,6 +14,11 @@ def get_user_by_id(db: Session, user_id: int) -> User | None:
     statement = select(User).where(User.id == user_id)
     return db.execute(statement).scalar_one_or_none()
 
+def get_user_by_google_sub(db: Session, google_sub: str) -> User | None:
+    statement = select(User).where(User.google_sub == google_sub)
+    return db.execute(statement).scalar_one_or_none()
+
+
 
 def create_user(
     db: Session,
@@ -34,6 +39,27 @@ def create_user(
 
     return user
 
+def create_google_user(
+    db: Session,
+    *,
+    email: str,
+    username: str,
+    google_sub: str,
+) -> User:
+    user = User(
+        email=email,
+        username=username,
+        hashed_password=None,
+        is_verified=True,
+        auth_provider="google",
+        google_sub=google_sub,
+    )
+
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+
+    return user
 
 def set_verification_token(
     db: Session,
@@ -99,3 +125,21 @@ def update_user_password(
     db.refresh(user)
 
     return user
+
+def link_google_account(
+    db: Session,
+    user: User,
+    *,
+    google_sub: str,
+) -> User:
+    user.google_sub = google_sub
+    user.is_verified = True
+
+    if user.auth_provider == "local":
+        user.auth_provider = "local_google"
+
+    db.commit()
+    db.refresh(user)
+
+    return user
+

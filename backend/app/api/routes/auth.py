@@ -2,32 +2,37 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+from google.auth.exceptions import GoogleAuthError
 from sqlalchemy.orm import Session
 
-from app.api.api.dependencies import get_current_user
-from app.core.config import settings
+from app.api.api.dependencies import get_current_user, issue_token_pair
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.tokens import (
     generate_token,
     get_token_expiration,
-    hash_token, get_refresh_token_expiration,
-)
+    hash_token, )
 from app.db.dependencies import get_db
 from app.models.user import User
 from app.repositories.refresh_token import (
-    create_refresh_token,
     delete_all_refresh_tokens_for_user,
     delete_refresh_token,
     get_refresh_token_by_hash,
 )
-from app.repositories.user import create_user, get_user_by_email, get_user_by_id, get_user_by_verification_token_hash, \
+from app.repositories.user import (
+    create_google_user,
+    get_user_by_email,
+    get_user_by_google_sub,
+    link_google_account,
+)
+from app.repositories.user import create_user, get_user_by_verification_token_hash, \
     verify_user_email, update_user_password, get_user_by_password_reset_token_hash, set_password_reset_token
 from app.repositories.user import set_verification_token
+from app.schemas.auth import GoogleAuthRequest
 from app.schemas.auth import LoginRequest, Token, MessageResponse, ResendVerificationRequest, ResetPasswordRequest, \
     ChangePasswordRequest, ForgotPasswordRequest, AccessTokenResponse, RefreshTokenRequest
 from app.schemas.user import UserCreate, UserResponse
 from app.services.email import send_verification_email, send_password_reset_email
+from app.services.google_auth import verify_google_id_token
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -85,21 +90,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
             detail="Email is not verified",
         )
 
-    access_token = create_access_token(subject=user.id)
-
-    refresh_token = generate_token()
-
-    create_refresh_token(
-        db,
-        user=user,
-        token_hash=hash_token(refresh_token),
-        expires_at=get_refresh_token_expiration(days=30),
-    )
-
-    return Token(
-        access_token=access_token,
-        refresh_token=refresh_token,
-    )
+    return issue_token_pair(db, user)
 
 
 @router.post("/logout-all", response_model=MessageResponse)
@@ -297,6 +288,55 @@ def refresh_access_token(
     access_token = create_access_token(subject=refresh_token.user_id)
 
     return AccessTokenResponse(access_token=access_token)
+
+@router.post("/google", response_model=Token)
+def google_auth(
+    payload: GoogleAuthRequest,
+    db: Session = Depends(get_db),
+):
+    try:
+        google_payload = verify_google_id_token(payload.id_token)
+    except (ValueError, GoogleAuthError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid Google token",
+        )
+
+    google_sub = google_payload.get("sub")
+    email = google_payload.get("email")
+    email_verified = google_payload.get("email_verified", False)
+
+    if not google_sub or not email or not email_verified:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Google account email is not verified",
+        )
+
+    user = get_user_by_google_sub(db, google_sub)
+
+    if user:
+        return issue_token_pair(db, user)
+
+    existing_user = get_user_by_email(db, email)
+
+    if existing_user:
+        user = link_google_account(
+            db,
+            existing_user,
+            google_sub=google_sub,
+        )
+        return issue_token_pair(db, user)
+
+    username = email.split("@")[0]
+
+    user = create_google_user(
+        db,
+        email=email,
+        username=username,
+        google_sub=google_sub,
+    )
+
+    return issue_token_pair(db, user)
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):

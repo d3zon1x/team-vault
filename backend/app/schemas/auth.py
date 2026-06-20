@@ -21,6 +21,10 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class GoogleAuthRequest(BaseModel):
+    id_token: str
+
+
 class MessageResponse(BaseModel):
     message: str
 
@@ -36,6 +40,7 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str
+
 
 class ChangePasswordRequest(BaseModel):
     current_password: str

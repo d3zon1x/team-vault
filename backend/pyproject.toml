@@ -18,6 +18,8 @@ dependencies = [
     "celery>=5.4.0",
     "redis>=5.0.0",
     "email-validator>=2.2.0",
+    "google-auth>=2.35.0",
+    "requests>=2.32.0",
 ]
 
 [project.optional-dependencies]
