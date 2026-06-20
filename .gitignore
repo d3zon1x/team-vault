@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment variables
+.env
+.env.*
+
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Type checking
+.mypy_cache/
+
+# Linting
+.ruff_cache/
+
+# Alembic
+alembic/versions/__pycache__/
+
+# Logs
+*.log
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Docker
+docker-data/
+
+# PostgreSQL
+postgres_data/
+
+# MinIO
+minio_data/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# React
+frontend/.vite/
+
+# Uploads
+uploads/
+
+# Temporary files
+tmp/
+temp/
