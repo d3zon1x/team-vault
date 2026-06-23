@@ -1,5 +1,5 @@
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models.workspace_member import WorkspaceMember
 
@@ -24,6 +24,7 @@ def get_workspace_members(
 ) -> list[WorkspaceMember]:
     statement = (
         select(WorkspaceMember)
+        .options(joinedload(WorkspaceMember.user))
         .where(WorkspaceMember.workspace_id == workspace_id)
         .order_by(WorkspaceMember.created_at.asc())
     )
@@ -36,7 +37,9 @@ def get_workspace_member_by_id(
     workspace_id: int,
     member_id: int,
 ) -> WorkspaceMember | None:
-    statement = select(WorkspaceMember).where(
+    statement = select(WorkspaceMember).options(
+        joinedload(WorkspaceMember.user),
+    ).where(
         WorkspaceMember.workspace_id == workspace_id,
         WorkspaceMember.id == member_id,
     )

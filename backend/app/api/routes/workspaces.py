@@ -35,6 +35,7 @@ from app.schemas.workspace import (
     AddWorkspaceMemberRequest,
     UpdateWorkspaceMemberRoleRequest,
     WorkspaceMemberResponse,
+    workspace_member_to_response,
 )
 from app.services.workspace_permissions import validate_workspace_role
 
@@ -144,7 +145,10 @@ def list_workspace_members(
         user=current_user,
     )
 
-    return get_workspace_members(db, workspace_id)
+    return [
+        workspace_member_to_response(member)
+        for member in get_workspace_members(db, workspace_id)
+    ]
 
 
 @router.post(
@@ -189,12 +193,14 @@ def add_member_to_workspace(
             detail="User is already a workspace member",
         )
 
-    return add_workspace_member(
+    member = add_workspace_member(
         db,
         workspace_id=workspace_id,
         user_id=user_to_add.id,
         role=payload.role,
     )
+
+    return workspace_member_to_response(member)
 
 
 @router.patch(
@@ -237,7 +243,9 @@ def update_member_role(
             detail="Owner role cannot be changed",
         )
 
-    return update_workspace_member_role(db, member, payload.role)
+    member = update_workspace_member_role(db, member, payload.role)
+
+    return workspace_member_to_response(member)
 
 
 @router.delete(

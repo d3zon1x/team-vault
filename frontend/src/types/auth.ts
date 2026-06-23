@@ -24,10 +24,11 @@ export interface RegisterResponse {
 }
 
 export interface User {
-  id: string;
+  id: number;
   email: string;
   username: string;
-  is_verified: boolean;
+  is_active?: boolean;
+  is_verified?: boolean;
 }
 
 export interface AuthState {

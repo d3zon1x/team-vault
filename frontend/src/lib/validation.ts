@@ -82,8 +82,41 @@ export const changePasswordSchema = z
     path: ['newPassword'],
   });
 
+export const createWorkspaceSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .max(100, 'Name must be less than 100 characters'),
+  description: z
+    .string()
+    .max(500, 'Description must be less than 500 characters')
+    .optional(),
+});
+
+export const updateWorkspaceSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .max(100, 'Name must be less than 100 characters'),
+  description: z
+    .string()
+    .max(500, 'Description must be less than 500 characters')
+    .optional(),
+});
+
+export const addMemberSchema = z.object({
+  email: z
+    .string()
+    .email('Invalid email address')
+    .min(1, 'Email is required'),
+  role: z.enum(['admin', 'editor', 'viewer']),
+});
+
 export type LoginFormData = z.infer<typeof loginSchema>;
 export type RegisterFormData = z.infer<typeof registerSchema>;
 export type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 export type ChangePasswordFormData = z.infer<typeof changePasswordSchema>;
+export type CreateWorkspaceFormData = z.infer<typeof createWorkspaceSchema>;
+export type UpdateWorkspaceFormData = z.infer<typeof updateWorkspaceSchema>;
+export type AddMemberFormData = z.infer<typeof addMemberSchema>;
