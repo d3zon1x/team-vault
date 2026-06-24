@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
+from sqlalchemy import delete
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -54,3 +55,13 @@ def delete_all_refresh_tokens_for_user(
         db.delete(token)
 
     db.commit()
+
+def delete_expired_refresh_tokens(db: Session) -> int:
+    statement = delete(RefreshToken).where(
+        RefreshToken.expires_at < datetime.now(timezone.utc)
+    )
+
+    result = db.execute(statement)
+    db.commit()
+
+    return result.rowcount or 0

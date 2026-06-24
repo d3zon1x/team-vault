@@ -1,6 +1,8 @@
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-from datetime import datetime
+from sqlalchemy import update
 
 from app.models.user import User
 
@@ -142,4 +144,36 @@ def link_google_account(
     db.refresh(user)
 
     return user
+
+
+def clear_expired_verification_tokens(db: Session) -> int:
+    statement = (
+        update(User)
+        .where(User.verification_token_expires_at < datetime.now(timezone.utc))
+        .values(
+            verification_token_hash=None,
+            verification_token_expires_at=None,
+        )
+    )
+
+    result = db.execute(statement)
+    db.commit()
+
+    return result.rowcount or 0
+
+
+def clear_expired_password_reset_tokens(db: Session) -> int:
+    statement = (
+        update(User)
+        .where(User.password_reset_expires_at < datetime.now(timezone.utc))
+        .values(
+            password_reset_token_hash=None,
+            password_reset_expires_at=None,
+        )
+    )
+
+    result = db.execute(statement)
+    db.commit()
+
+    return result.rowcount or 0
 

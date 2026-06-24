@@ -18,6 +18,10 @@ import { CreateWorkspacePage } from './pages/CreateWorkspacePage';
 import { WorkspaceDetailPage } from './pages/WorkspaceDetailPage';
 import { WorkspaceSettingsPage } from './pages/WorkspaceSettingsPage';
 import { WorkspaceMembersPage } from './pages/WorkspaceMembersPage';
+import { PagesListPage } from './pages/PagesListPage';
+import { CreatePagePage } from './pages/CreatePagePage';
+import { PageEditorPage } from './pages/PageEditorPage';
+import { AuditLogsPage } from './pages/AuditLogsPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,6 +54,15 @@ function App() {
               <Route path="/dashboard" element={<DashboardPage />} />
               <Route path="/workspaces/new" element={<CreateWorkspacePage />} />
               <Route path="/workspaces/:id" element={<WorkspaceDetailPage />} />
+              <Route path="/workspaces/:id/pages" element={<PagesListPage />} />
+              <Route
+                path="/workspaces/:id/pages/new"
+                element={<CreatePagePage />}
+              />
+              <Route
+                path="/workspaces/:id/pages/:pageId"
+                element={<PageEditorPage />}
+              />
               <Route
                 path="/workspaces/:id/settings"
                 element={<WorkspaceSettingsPage />}
@@ -57,6 +70,10 @@ function App() {
               <Route
                 path="/workspaces/:id/members"
                 element={<WorkspaceMembersPage />}
+              />
+              <Route
+                path="/workspaces/:id/audit-logs"
+                element={<AuditLogsPage />}
               />
               <Route path="/change-password" element={<ChangePasswordPage />} />
             </Route>

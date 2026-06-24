@@ -4,8 +4,11 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.api.api.dependencies import get_current_user
+from app.core.audit_actions import WORKSPACE_CREATED, WORKSPACE_UPDATED, WORKSPACE_DELETED, MEMBER_ROLE_UPDATED, \
+    MEMBER_REMOVED, MEMBER_ADDED
 from app.db.dependencies import get_db
 from app.models.user import User
+from app.repositories.audit_log import create_audit_log
 from app.repositories.workspace import (
     create_workspace,
     delete_workspace,
@@ -52,12 +55,27 @@ def create_workspace_endpoint(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    return create_workspace(
+    workspace = create_workspace(
         db,
         name=payload.name,
         description=payload.description,
         owner=current_user,
     )
+
+    create_audit_log(
+        db,
+        workspace_id=workspace.id,
+        actor=current_user,
+        action=WORKSPACE_CREATED,
+        entity_type="workspace",
+        entity_id=workspace.id,
+        description=f"Created workspace '{workspace.name}'",
+    )
+
+    db.commit()
+    db.refresh(workspace)
+
+    return workspace
 
 
 @router.get("", response_model=list[WorkspaceResponse])
@@ -101,6 +119,23 @@ def update_workspace_endpoint(
         minimum_role="admin",
     )
 
+    create_audit_log(
+        db,
+        workspace_id=workspace.id,
+        actor=current_user,
+        action=WORKSPACE_UPDATED,
+        entity_type="workspace",
+        entity_id=workspace.id,
+        description=f"Updated workspace '{workspace.name}'",
+        metadata={
+            "name": payload.name,
+            "description": payload.description,
+        },
+    )
+
+    db.commit()
+    db.refresh(workspace)
+
     return update_workspace(
         db,
         workspace,
@@ -123,6 +158,18 @@ def delete_workspace_endpoint(
         user=current_user,
         minimum_role="owner",
     )
+
+    create_audit_log(
+        db,
+        workspace_id=workspace.id,
+        actor=current_user,
+        action=WORKSPACE_DELETED,
+        entity_type="workspace",
+        entity_id=workspace.id,
+        description=f"Deleted workspace '{workspace.name}'",
+    )
+
+    db.commit()
 
     delete_workspace(db, workspace)
 
@@ -200,6 +247,24 @@ def add_member_to_workspace(
         role=payload.role,
     )
 
+    create_audit_log(
+        db,
+        workspace_id=workspace_id,
+        actor=current_user,
+        action=MEMBER_ADDED,
+        entity_type="workspace_member",
+        entity_id=member.id,
+        description=f"Added user {user_to_add.email} as {payload.role}",
+        metadata={
+            "user_id": user_to_add.id,
+            "email": user_to_add.email,
+            "role": payload.role,
+        },
+    )
+
+    db.commit()
+    db.refresh(member)
+
     return workspace_member_to_response(member)
 
 
@@ -245,6 +310,24 @@ def update_member_role(
 
     member = update_workspace_member_role(db, member, payload.role)
 
+    create_audit_log(
+        db,
+        workspace_id=workspace_id,
+        actor=current_user,
+        action=MEMBER_ROLE_UPDATED,
+        entity_type="workspace_member",
+        entity_id=member.id,
+        description=f"Updated member role to {payload.role}",
+        metadata={
+            "member_id": member.id,
+            "user_id": member.user_id,
+            "new_role": payload.role,
+        },
+    )
+
+    db.commit()
+    db.refresh(member)
+
     return workspace_member_to_response(member)
 
 
@@ -284,6 +367,23 @@ def remove_member_from_workspace(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Owner cannot be removed from workspace",
         )
+
+    create_audit_log(
+        db,
+        workspace_id=workspace_id,
+        actor=current_user,
+        action=MEMBER_REMOVED,
+        entity_type="workspace_member",
+        entity_id=member.id,
+        description="Removed workspace member",
+        metadata={
+            "member_id": member.id,
+            "user_id": member.user_id,
+            "role": member.role,
+        },
+    )
+
+    db.commit()
 
     remove_workspace_member(db, member)
 

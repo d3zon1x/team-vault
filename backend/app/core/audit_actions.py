@@ -1,0 +1,20 @@
+WORKSPACE_CREATED = "workspace.created"
+WORKSPACE_UPDATED = "workspace.updated"
+WORKSPACE_DELETED = "workspace.deleted"
+
+MEMBER_ADDED = "member.added"
+MEMBER_ROLE_UPDATED = "member.role_updated"
+MEMBER_REMOVED = "member.removed"
+
+PAGE_CREATED = "page.created"
+PAGE_UPDATED = "page.updated"
+PAGE_AUTOSAVED = "page.autosaved"
+PAGE_PUBLISHED = "page.published"
+PAGE_ARCHIVED = "page.archived"
+PAGE_RESTORED = "page.restored"
+PAGE_DELETED = "page.deleted"
+PAGE_VERSION_CREATED = "page.version_created"
+PAGE_VERSION_RESTORED = "page.version_restored"
+
+ATTACHMENT_UPLOADED = "attachment.uploaded"
+ATTACHMENT_DELETED = "attachment.deleted"

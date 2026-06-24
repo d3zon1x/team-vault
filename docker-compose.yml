@@ -59,6 +59,20 @@ services:
     volumes:
       - minio_data:/data
 
+  celery_worker:
+    build:
+      context: ./backend
+    container_name: teamvault_celery_worker
+    command: celery -A app.workers.celery_app.celery_app worker --loglevel=info
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+      - postgres
+      - backend
+
 volumes:
   postgres_data:
   minio_data:

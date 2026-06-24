@@ -12,6 +12,8 @@ import {
 } from '../hooks/useWorkspaces';
 import { addMemberSchema } from '../lib/validation';
 import type { AddMemberFormData } from '../lib/validation';
+import { useLayoutHeader } from '../context/LayoutContext';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { LoadingState, ErrorState, EmptyState } from '../components/ui/StateViews';
 import { RoleBadge } from '../components/workspace/RoleBadge';
 import {
@@ -30,6 +32,7 @@ export const WorkspaceMembersPage: React.FC = () => {
   const workspaceId = Number(id);
   const { user } = useAuth();
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
 
   const { data: workspace, isLoading: workspaceLoading } =
     useWorkspace(workspaceId);
@@ -81,17 +84,34 @@ export const WorkspaceMembersPage: React.FC = () => {
     }
   };
 
-  const handleRemove = async (memberId: number) => {
-    setRemovingId(memberId);
+  const handleRemove = async () => {
+    if (!confirmRemoveId) return;
+    setRemovingId(confirmRemoveId);
     try {
-      await removeMember.mutateAsync(memberId);
+      await removeMember.mutateAsync(confirmRemoveId);
       toast.success('Member removed');
+      setConfirmRemoveId(null);
     } catch (err) {
       toast.error(getApiErrorMessage(err, 'Failed to remove member'));
     } finally {
       setRemovingId(null);
     }
   };
+
+  useLayoutHeader(
+    {
+      title: 'Members',
+      subtitle: workspace?.name,
+      breadcrumbs: workspace
+        ? [
+            { label: 'Dashboard', to: '/dashboard' },
+            { label: workspace.name, to: `/workspaces/${workspaceId}` },
+            { label: 'Members' },
+          ]
+        : undefined,
+    },
+    [workspace, workspaceId],
+  );
 
   if (workspaceLoading || membersLoading) {
     return <LoadingState message="Loading members..." />;
@@ -108,17 +128,8 @@ export const WorkspaceMembersPage: React.FC = () => {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold">Members</h1>
-        <p className="text-slate-400 mt-1">
-          {workspace?.name
-            ? `Manage who has access to ${workspace.name}`
-            : 'Manage workspace access'}
-        </p>
-      </div>
-
       {canManage && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 mb-8">
+        <div className="bg-white border border-slate-200 rounded-xl p-6 mb-8 shadow-sm">
           <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <UserPlus size={20} className="text-blue-400" />
             Add member
@@ -132,7 +143,7 @@ export const WorkspaceMembersPage: React.FC = () => {
                 {...register('email')}
                 type="email"
                 placeholder="colleague@company.com"
-                className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white placeholder-slate-500 transition-all"
+                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
               />
               {errors.email && (
                 <p className="text-red-400 text-sm mt-1">{errors.email.message}</p>
@@ -140,7 +151,7 @@ export const WorkspaceMembersPage: React.FC = () => {
             </div>
             <select
               {...register('role')}
-              className="px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:border-blue-500 text-white"
+              className="px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20"
             >
               <option value="viewer">Viewer</option>
               <option value="editor">Editor</option>
@@ -149,7 +160,7 @@ export const WorkspaceMembersPage: React.FC = () => {
             <button
               type="submit"
               disabled={addMember.isPending}
-              className="px-5 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg font-semibold text-sm hover:shadow-lg hover:shadow-blue-500/30 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-semibold text-sm hover:bg-blue-500 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {addMember.isPending ? (
                 <Loader size={16} className="animate-spin" />
@@ -162,7 +173,7 @@ export const WorkspaceMembersPage: React.FC = () => {
       )}
 
       {!canManage && (
-        <div className="mb-6 p-4 rounded-lg bg-slate-800/50 border border-slate-700/50 text-slate-400 text-sm">
+        <div className="mb-6 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
           You can view members but need admin access to make changes.
         </div>
       )}
@@ -176,14 +187,14 @@ export const WorkspaceMembersPage: React.FC = () => {
       )}
 
       {members && members.length > 0 && (
-        <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
-          <div className="hidden sm:grid sm:grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 border-b border-slate-700/50 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="hidden sm:grid sm:grid-cols-[1fr_auto_auto_auto] gap-4 px-5 py-3 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
             <span>Member</span>
             <span>Role</span>
             <span>Joined</span>
             <span />
           </div>
-          <ul className="divide-y divide-slate-700/50">
+          <ul className="divide-y divide-slate-100">
             {members.map((member) => {
               const isCurrentUser = isSameUser(user?.id, member.user_id);
               const isOwner = member.role === 'owner';
@@ -194,7 +205,7 @@ export const WorkspaceMembersPage: React.FC = () => {
                   className="px-5 py-4 flex flex-col sm:grid sm:grid-cols-[1fr_auto_auto_auto] sm:items-center gap-3 sm:gap-4"
                 >
                   <div>
-                    <p className="font-medium text-white">
+                    <p className="font-medium text-slate-900">
                       {member.username}
                       {isCurrentUser && (
                         <span className="ml-2 text-xs text-blue-400">(you)</span>
@@ -214,7 +225,7 @@ export const WorkspaceMembersPage: React.FC = () => {
                           )
                         }
                         disabled={updateMemberRole.isPending}
-                        className="px-3 py-1.5 bg-slate-700/50 border border-slate-600 rounded-lg text-sm text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                        className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-50"
                       >
                         <option value="viewer">Viewer</option>
                         <option value="editor">Editor</option>
@@ -232,7 +243,7 @@ export const WorkspaceMembersPage: React.FC = () => {
                   <div className="sm:text-right">
                     {canManage && !isOwner && !isCurrentUser && (
                       <button
-                        onClick={() => handleRemove(member.id)}
+                        onClick={() => setConfirmRemoveId(member.id)}
                         disabled={removingId === member.id}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-50"
                       >
@@ -251,6 +262,17 @@ export const WorkspaceMembersPage: React.FC = () => {
           </ul>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmRemoveId !== null}
+        title="Remove member?"
+        description="This user will lose access to the workspace."
+        confirmLabel="Remove"
+        variant="danger"
+        isLoading={removingId !== null}
+        onConfirm={handleRemove}
+        onCancel={() => setConfirmRemoveId(null)}
+      />
     </div>
   );
 };

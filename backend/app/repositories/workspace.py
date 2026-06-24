@@ -38,8 +38,7 @@ def create_workspace(
     )
 
     db.add(member)
-    db.commit()
-    db.refresh(workspace)
+    db.flush()
 
     return workspace
 

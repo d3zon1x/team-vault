@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, ArrowRight, Loader } from 'lucide-react';
+import { useLayoutHeader } from '../context/LayoutContext';
 import { createWorkspaceSchema } from '../lib/validation';
 import type { CreateWorkspaceFormData } from '../lib/validation';
 import { useCreateWorkspace } from '../hooks/useWorkspaces';
@@ -12,6 +13,17 @@ import { toast } from 'sonner';
 export const CreateWorkspacePage: React.FC = () => {
   const navigate = useNavigate();
   const createWorkspace = useCreateWorkspace();
+
+  useLayoutHeader(
+    {
+      title: 'New workspace',
+      breadcrumbs: [
+        { label: 'Dashboard', to: '/dashboard' },
+        { label: 'New workspace' },
+      ],
+    },
+    [],
+  );
 
   const {
     register,
@@ -39,15 +51,15 @@ export const CreateWorkspacePage: React.FC = () => {
     <div className="max-w-lg mx-auto">
       <Link
         to="/dashboard"
-        className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white transition-colors mb-6"
+        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors mb-6"
       >
         <ArrowLeft size={16} />
         Back to dashboard
       </Link>
 
-      <div className="bg-slate-800/50 border border-slate-700/50 rounded-xl p-6 sm:p-8">
-        <h1 className="text-2xl font-bold mb-1">Create workspace</h1>
-        <p className="text-slate-400 text-sm mb-6">
+      <div className="bg-white border border-slate-200 rounded-xl p-6 sm:p-8 shadow-sm">
+        <h2 className="text-lg font-semibold text-slate-900 mb-1">Create workspace</h2>
+        <p className="text-slate-500 text-sm mb-6">
           Set up a new space for your team&apos;s documentation.
         </p>
 
@@ -60,7 +72,7 @@ export const CreateWorkspacePage: React.FC = () => {
               {...register('name')}
               type="text"
               placeholder="Engineering Docs"
-              className="w-full px-4 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-white placeholder-slate-500 transition-all"
+              className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
             />
             {errors.name && (
               <p className="text-red-400 text-sm mt-1">{errors.name.message}</p>

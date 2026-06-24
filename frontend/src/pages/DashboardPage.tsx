@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, FolderOpen } from 'lucide-react';
+import { useLayoutHeader } from '../context/LayoutContext';
 import { useWorkspaces } from '../hooks/useWorkspaces';
 import { WorkspaceCard } from '../components/workspace/WorkspaceCard';
 import { LoadingState, ErrorState, EmptyState } from '../components/ui/StateViews';
@@ -9,24 +10,25 @@ import { getApiErrorMessage } from '../lib/utils';
 export const DashboardPage: React.FC = () => {
   const { data: workspaces, isLoading, isError, error, refetch } = useWorkspaces();
 
-  return (
-    <div>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Workspaces</h1>
-          <p className="text-slate-400 mt-1">
-            Manage your team knowledge bases
-          </p>
-        </div>
+  useLayoutHeader(
+    {
+      title: 'Dashboard',
+      subtitle: 'Your team knowledge bases',
+      primaryAction: (
         <Link
           to="/workspaces/new"
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg font-semibold hover:shadow-lg hover:shadow-blue-500/30 transition-all text-sm"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-500 transition-colors"
         >
-          <Plus size={18} />
+          <Plus size={16} />
           New workspace
         </Link>
-      </div>
+      ),
+    },
+    [],
+  );
 
+  return (
+    <div>
       {isLoading && <LoadingState message="Loading workspaces..." />}
 
       {isError && (
@@ -38,15 +40,15 @@ export const DashboardPage: React.FC = () => {
 
       {!isLoading && !isError && workspaces?.length === 0 && (
         <EmptyState
-          icon={<FolderOpen className="text-slate-500" size={28} />}
+          icon={<FolderOpen className="text-slate-400" size={28} />}
           title="No workspaces yet"
           description="Create your first workspace to start organizing team documentation."
           action={
             <Link
               to="/workspaces/new"
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg font-semibold text-sm hover:shadow-lg hover:shadow-blue-500/30 transition-all"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-500 transition-colors"
             >
-              <Plus size={18} />
+              <Plus size={16} />
               Create workspace
             </Link>
           }

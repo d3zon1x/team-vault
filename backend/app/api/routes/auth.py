@@ -31,8 +31,22 @@ from app.schemas.auth import GoogleAuthRequest
 from app.schemas.auth import LoginRequest, Token, MessageResponse, ResendVerificationRequest, ResetPasswordRequest, \
     ChangePasswordRequest, ForgotPasswordRequest, AccessTokenResponse, RefreshTokenRequest
 from app.schemas.user import UserCreate, UserResponse
-from app.services.email import send_verification_email, send_password_reset_email
 from app.services.google_auth import verify_google_id_token
+from app.workers.email_tasks import (
+    send_password_reset_email_task,
+    send_verification_email_task,
+)
+from app.core.rate_limits import (
+    AUTH_FORGOT_PASSWORD_LIMIT,
+    AUTH_FORGOT_PASSWORD_WINDOW_SECONDS,
+    AUTH_LOGIN_LIMIT,
+    AUTH_LOGIN_WINDOW_SECONDS,
+    AUTH_REGISTER_LIMIT,
+    AUTH_REGISTER_WINDOW_SECONDS,
+    AUTH_RESEND_VERIFICATION_LIMIT,
+    AUTH_RESEND_VERIFICATION_WINDOW_SECONDS,
+)
+from app.services.rate_limit import check_rate_limit
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -45,6 +59,12 @@ security = HTTPBearer()
     status_code=status.HTTP_201_CREATED,
 )
 def register(payload: UserCreate, db: Session = Depends(get_db)):
+    check_rate_limit(
+        key=f"rate_limit:auth:register:{payload.email.lower()}",
+        limit=AUTH_REGISTER_LIMIT,
+        window_seconds=AUTH_REGISTER_WINDOW_SECONDS,
+    )
+
     existing_user = get_user_by_email(db, payload.email)
 
     if existing_user:
@@ -69,13 +89,21 @@ def register(payload: UserCreate, db: Session = Depends(get_db)):
         get_token_expiration(hours=24),
     )
 
-    send_verification_email(user.email, verification_token)
-
+    send_verification_email_task.delay(
+        user.email,
+        verification_token,
+    )
     return MessageResponse(message="Registration successful. Check your email.")
 
 
 @router.post("/login", response_model=Token)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    check_rate_limit(
+        key=f"rate_limit:auth:login:{payload.email.lower()}",
+        limit=AUTH_LOGIN_LIMIT,
+        window_seconds=AUTH_LOGIN_WINDOW_SECONDS,
+    )
+
     user = get_user_by_email(db, payload.email)
 
     if not user or not verify_password(payload.password, user.hashed_password):
@@ -149,6 +177,12 @@ def resend_verification(
         payload: ResendVerificationRequest,
         db: Session = Depends(get_db),
 ):
+    check_rate_limit(
+        key=f"rate_limit:auth:resend_verification:{payload.email.lower()}",
+        limit=AUTH_RESEND_VERIFICATION_LIMIT,
+        window_seconds=AUTH_RESEND_VERIFICATION_WINDOW_SECONDS,
+    )
+
     user = get_user_by_email(db, payload.email)
 
     if not user:
@@ -168,8 +202,10 @@ def resend_verification(
         get_token_expiration(hours=24),
     )
 
-    send_verification_email(user.email, verification_token)
-
+    send_verification_email_task.delay(
+        user.email,
+        verification_token,
+    )
     return MessageResponse(
         message="If this email exists, verification instructions were sent."
     )
@@ -180,6 +216,12 @@ def forgot_password(
         payload: ForgotPasswordRequest,
         db: Session = Depends(get_db),
 ):
+    check_rate_limit(
+        key=f"rate_limit:auth:forgot_password:{payload.email.lower()}",
+        limit=AUTH_FORGOT_PASSWORD_LIMIT,
+        window_seconds=AUTH_FORGOT_PASSWORD_WINDOW_SECONDS,
+    )
+
     user = get_user_by_email(db, payload.email)
 
     if not user:
@@ -196,7 +238,10 @@ def forgot_password(
         get_token_expiration(hours=1),
     )
 
-    send_password_reset_email(user.email, reset_token)
+    send_password_reset_email_task.delay(
+        user.email,
+        reset_token,
+    )
 
     return MessageResponse(
         message="If this email exists, password reset instructions were sent."

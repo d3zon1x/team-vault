@@ -13,11 +13,11 @@ export const LoadingState: React.FC<LoadingStateProps> = ({
 }) => (
   <div
     className={cn(
-      'flex flex-col items-center justify-center py-16 text-slate-400',
+      'flex flex-col items-center justify-center py-16 text-slate-500',
       className,
     )}
   >
-    <Loader2 className="animate-spin text-blue-400 mb-3" size={36} />
+    <Loader2 className="animate-spin text-blue-500 mb-3" size={36} />
     <p className="text-sm">{message}</p>
   </div>
 );
@@ -44,12 +44,12 @@ export const ErrorState: React.FC<ErrorStateProps> = ({
     <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mb-4">
       <AlertCircle className="text-red-400" size={24} />
     </div>
-    <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-    <p className="text-slate-400 text-sm max-w-md mb-4">{message}</p>
+    <h3 className="text-lg font-semibold text-slate-900 mb-2">{title}</h3>
+    <p className="text-slate-500 text-sm max-w-md mb-4">{message}</p>
     {onRetry && (
       <button
         onClick={onRetry}
-        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-sm font-medium transition-colors"
+        className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors"
       >
         Try again
       </button>
@@ -78,11 +78,11 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
       className,
     )}
   >
-    <div className="w-14 h-14 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center mb-4">
-      {icon ?? <Inbox className="text-slate-500" size={28} />}
+    <div className="w-14 h-14 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center mb-4">
+      {icon ?? <Inbox className="text-slate-400" size={28} />}
     </div>
-    <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
-    <p className="text-slate-400 text-sm max-w-md mb-6">{description}</p>
+    <h3 className="text-lg font-semibold text-slate-900 mb-2">{title}</h3>
+    <p className="text-slate-500 text-sm max-w-md mb-6">{description}</p>
     {action}
   </div>
 );
